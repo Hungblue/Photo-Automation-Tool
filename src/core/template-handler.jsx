@@ -174,7 +174,7 @@ BaseTemplateHandler.prototype.handleColorRange = function(key, value) {
     
     // Trim whitespace from colors
     for (var i = 0; i < colorArray.length; i++) {
-      colorArray[i] = colorArray[i].trim();
+      colorArray[i] = colorArray[i].replace(/^\s+|\s+$/g, "");
     }
     
     var success = setTextColorRange(this.doc, layerName, colorArray);
@@ -203,8 +203,8 @@ BaseTemplateHandler.prototype.handleImages = function(value) {
     if (typeof value === "string") {
       var imagePaths = value.split(",");
       for (var i = 0; i < imagePaths.length; i++) {
-        var path = imagePaths[i].trim();
-        imageArray.push({
+      var path = imagePaths[i].replace(/^\s+|\s+$/g, "");
+      imageArray.push({
           layerName: "Image Layer " + (i + 1),
           imagePath: path
         });

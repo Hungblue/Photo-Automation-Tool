@@ -2,6 +2,25 @@
 // Template Service - Handle template validation and download
 // ============================================
 
+// Global constants
+// Resolve absolute path based on script location: src/services/template-service.jsx
+// Need to go up 3 levels: services -> src -> root
+var scriptFile = new File($.fileName);
+var scriptFolder = scriptFile.parent; // src/services
+var srcFolder = scriptFolder.parent;  // src
+var rootFolder = srcFolder.parent;    // root
+
+// Normalize path separators to forward slashes
+var rootPath = rootFolder.fsName.replace(/\\/g, "/");
+var TEMPLATES_FOLDER = rootPath + "/templates";
+
+// Log the resolved path for debugging
+try {
+  if (typeof logInfo === "function") {
+    logInfo("Resolved TEMPLATES_FOLDER: " + TEMPLATES_FOLDER);
+  }
+} catch(e) {}
+
 /**
  * Load settings from JSON file
  * @returns {Object} - Settings object
@@ -35,7 +54,15 @@ function loadSettings() {
  */
 function checkTemplateExists(productType, templateName) {
   try {
-    var templatePath = TEMPLATES_FOLDER + "/" + productType + "/" + templateName;
+    // Ensure template name has .psd extension
+    var fileName = templateName;
+    var lowerName = fileName.toLowerCase();
+    var hasPsdExt = lowerName.substring(lowerName.length - 4) === ".psd";
+    if (!hasPsdExt) {
+      fileName = fileName + ".psd";
+    }
+    
+    var templatePath = TEMPLATES_FOLDER + "/" + productType + "/" + fileName;
     var file = new File(templatePath);
     
     var exists = file.exists;
@@ -96,7 +123,9 @@ function validateTemplate(templatePath) {
     }
     
     // Check file extension
-    if (!templatePath.toLowerCase().endsWith(".psd")) {
+    var lowerPath = templatePath.toLowerCase();
+    var hasPsdExt = lowerPath.substring(lowerPath.length - 4) === ".psd";
+    if (!hasPsdExt) {
       logError("validateTemplate", "Template must be a PSD file");
       return false;
     }
@@ -164,8 +193,18 @@ function getTemplateConfig(productType) {
  */
 function getTemplatePath(productType, templateName) {
   try {
-    var localPath = TEMPLATES_FOLDER + "/" + productType + "/" + templateName;
+    // Ensure template name has .psd extension
+    var fileName = templateName;
+    var lowerName = fileName.toLowerCase();
+    var hasPsdExt = lowerName.substring(lowerName.length - 4) === ".psd";
+    if (!hasPsdExt) {
+      fileName = fileName + ".psd";
+    }
+    
+    var localPath = TEMPLATES_FOLDER + "/" + productType + "/" + fileName;
     var file = new File(localPath);
+    
+    logDebug("Checking template path: " + localPath);
     
     // Check if exists locally
     if (file.exists) {
@@ -175,7 +214,7 @@ function getTemplatePath(productType, templateName) {
     
     // Try to download from S3
     logInfo("Template not found locally, attempting download...");
-    var downloaded = downloadTemplate(productType, templateName);
+    var downloaded = downloadTemplate(productType, fileName);
     
     if (downloaded && file.exists) {
       logInfo("Template downloaded successfully");
@@ -183,7 +222,7 @@ function getTemplatePath(productType, templateName) {
     }
     
     // Template not available
-    logError("getTemplatePath", "Template not available: " + templateName);
+    logError("getTemplatePath", "Template not available: " + fileName);
     return null;
     
   } catch (e) {

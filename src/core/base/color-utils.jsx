@@ -137,6 +137,46 @@ function applyColorRangeToText(doc, layerName, colorArray) {
 }
 
 /**
+ * Apply color range to text (randomly per character)
+ * @param {Document} doc - Photoshop document
+ * @param {String} layerName - Layer name
+ * @param {Array} colorArray - Array of hex colors
+ */
+function applyRandomColorRangeToText(doc, layerName, colorArray) {
+  try {
+    var layer = findLayerByName(doc, layerName);
+    if (!layer || layer.kind !== LayerKind.TEXT) {
+      logError("applyRandomColorRangeToText", "Layer not found or not a text layer: " + layerName);
+      return false;
+    }
+    
+    var text = layer.textItem.contents;
+    var charCount = text.length;
+    
+    // Convert hex colors to SolidColor objects
+    var colors = createGradient(colorArray);
+    if (colors.length === 0) {
+      logError("applyRandomColorRangeToText", "No valid colors in array");
+      return false;
+    }
+    
+    // Apply colors randomly to characters
+    for (var i = 0; i < charCount; i++) {
+        // Random index
+        var colorIndex = Math.floor(Math.random() * colors.length);
+        layer.textItem.characters[i].color = colors[colorIndex];
+    }
+    
+    logInfo("Applied random color range to " + charCount + " characters");
+    return true;
+    
+  } catch (e) {
+    logError("applyRandomColorRangeToText", e);
+    return false;
+  }
+}
+
+/**
  * RGB to Hex converter (utility)
  */
 function rgbToHex(r, g, b) {

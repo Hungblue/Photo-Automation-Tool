@@ -3,9 +3,17 @@
 // ============================================
 
 // Global constants
-var TEMPLATES_FOLDER = "./templates";
-var OUTPUT_FOLDER = "./output";
-var LOGS_FOLDER = "./logs";
+// Resolve paths based on script location to avoid Current Working Directory issues
+// export-utils.jsx is in src/core/base/
+var scriptFile = new File($.fileName);
+var baseFolder = scriptFile.parent; // src/core/base
+var coreFolder = baseFolder.parent; // src/core
+var srcFolder = coreFolder.parent;  // src
+var projectRoot = srcFolder.parent; // PhotoshopTool
+
+var TEMPLATES_FOLDER = projectRoot.fsName + "/templates";
+var OUTPUT_FOLDER = projectRoot.fsName + "/output";
+var LOGS_FOLDER = projectRoot.fsName + "/logs";
 
 /**
  * Export document to PNG
@@ -29,30 +37,74 @@ function exportToPNG(doc, productId, productType, scale) {
     var fullPath = outputPath + "/" + fileName;
     var outputFile = new File(fullPath);
     
-    // Resize document if scale != 1.0
-    if (scale !== 1.0) {
-      var currentWidth = doc.width.as("px");
-      var currentHeight = doc.height.as("px");
-      var newWidth = currentWidth * scale;
-      var newHeight = currentHeight * scale;
-      
-      doc.resizeImage(
-        new UnitValue(newWidth, "px"),
-        new UnitValue(newHeight, "px"),
-        doc.resolution,
-        ResampleMethod.BICUBIC
-      );
-    }
-    
+    logInfo("DEBUG: Output file path: " + fullPath);
+
     // PNG save options
     var pngOptions = new PNGSaveOptions();
-    pngOptions.compression = 9;
+    pngOptions.compression = 0; // User requested 0
     pngOptions.interlaced = false;
+    logInfo("DEBUG: PNG Options created");
+
+    // Resize logic
+    if (Math.abs(scale - 1.0) > 0.001) {
+         logInfo("DEBUG: Scaling to " + scale);
+         // Scaling required
+         try {
+             var w_val = doc.width;
+             var h_val = doc.height;
+             logInfo("DEBUG: Current dimensions: " + w_val + " x " + h_val);
+             
+             // Check if .as method exists
+             if (typeof w_val.as === 'undefined') {
+                 logInfo("DEBUG: UnitValue.as method undefined!");
+                 // Fallback or throw?
+             }
+             
+             var w_px = w_val.as("px");
+             var h_px = h_val.as("px");
+             logInfo("DEBUG: Pixel dimensions: " + w_px + " x " + h_px);
+             
+             var newWidth = new UnitValue(w_px * scale, "px");
+             var newHeight = new UnitValue(h_px * scale, "px");
+             
+             doc.resizeImage(newWidth, newHeight, 300, ResampleMethod.BICUBIC);
+             logInfo("DEBUG: Resize complete");
+         } catch(resizeErr) {
+             logError("DEBUG: Resize failed: " + resizeErr.message);
+             throw resizeErr;
+         }
+    } else {
+        // Just set DPI (safe method)
+        if (doc.resolution !== 300) {
+             logInfo("DEBUG: Adjusting DPI only from " + doc.resolution);
+             doc.resizeImage(undefined, undefined, 300, ResampleMethod.NONE);
+        }
+    }
     
+    // Resolve Extension.LOWERCASE safely
+    var extType = undefined;
+    try {
+        extType = Extension.LOWERCASE;
+        logInfo("DEBUG: Extension.LOWERCASE available");
+    } catch(e) {
+        logInfo("DEBUG: Extension object or LOWERCASE undefined");
+    }
+
     // Save as PNG
-    doc.saveAs(outputFile, pngOptions, true, Extension.LOWERCASE);
+    try {
+        logInfo("DEBUG: Saving to " + outputFile.fsName);
+        if (extType) {
+            doc.saveAs(outputFile, pngOptions, true, extType);
+        } else {
+            doc.saveAs(outputFile, pngOptions, true);
+        }
+        logInfo("DEBUG: Save successful");
+    } catch (saveErr) {
+        logError("Failed to save PNG (Line " + (saveErr.line || "?") + "): " + saveErr.message);
+        throw saveErr;
+    }
     
-    logInfo("Exported PNG: " + fullPath);
+    logInfo("Exported PNG (300dpi, x" + scale + "): " + fullPath);
     return fullPath;
     
   } catch (e) {

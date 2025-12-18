@@ -2,54 +2,48 @@
 // Main Entry Point - Photoshop Tool
 // ============================================
 
-// Include all dependencies
-// @include "utils/logger.jsx"
-// @include "utils/validator.jsx"
-// @include "core/base/layer-utils.jsx"
-// @include "core/base/color-utils.jsx"
-// @include "core/base/text-utils.jsx"
-// @include "core/base/image-utils.jsx"
-// @include "core/base/export-utils.jsx"
-// @include "services/api-service.jsx"
-// @include "services/csv-service.jsx"
-// @include "services/template-service.jsx"
-// @include "core/template-handler.jsx"
-// @include "core/processor.jsx"
-// @include "ui/main-panel.jsx"
+// Libraries
+//@include "lib/polyfills.js"
+//@include "lib/json2.js"
 
-/**
- * Load all script files
- */
-function loadScripts() {
-  var scriptFolder = new File($.fileName).parent;
-  var scripts = [
-    "utils/logger.jsx",
-    "utils/validator.jsx",
-    "core/base/layer-utils.jsx",
-    "core/base/color-utils.jsx",
-    "core/base/text-utils.jsx",
-    "core/base/image-utils.jsx",
-    "core/base/export-utils.jsx",
-    "services/api-service.jsx",
-    "services/csv-service.jsx",
-    "services/template-service.jsx",
-    "core/template-handler.jsx",
-    "core/processor.jsx",
-    "ui/main-panel.jsx"
-  ];
-  
-  for (var i = 0; i < scripts.length; i++) {
-    var scriptPath = scriptFolder.fsName + "/" + scripts[i];
-    try {
-      $.evalFile(scriptPath);
-    } catch (e) {
-      alert("Error loading " + scripts[i] + ": " + e.message);
-      return false;
-    }
-  }
-  
-  return true;
-}
+// Utilities
+//@include "utils/logger.jsx"
+//@include "utils/validator.jsx"
+
+// Base Utilities
+//@include "core/base/layer-utils.jsx"
+//@include "core/base/color-utils.jsx"
+//@include "core/base/text-utils.jsx"
+//@include "core/base/image-utils.jsx"
+//@include "core/base/export-utils.jsx"
+
+// Services
+//@include "services/api-service.jsx"
+//@include "services/csv-service.jsx"
+//@include "services/template-service.jsx"
+
+// 1-Layer Handlers
+//@include "core/one-layer/text-handler.jsx"
+//@include "core/one-layer/font-handler.jsx"
+//@include "core/one-layer/size-handler.jsx"
+//@include "core/one-layer/color-hex-handler.jsx"
+//@include "core/one-layer/color-range-handler.jsx"
+//@include "core/one-layer/image-handler.jsx"
+
+// 2-Layers Handlers
+//@include "core/two-layers/text-handler.jsx"
+//@include "core/two-layers/font-handler.jsx"
+//@include "core/two-layers/size-handler.jsx"
+//@include "core/two-layers/color-hex-handler.jsx"
+//@include "core/two-layers/color-range-handler.jsx"
+//@include "core/two-layers/image-handler.jsx"
+
+// Core Logic
+//@include "core/layer-router.jsx"
+//@include "core/processor.jsx"
+
+// UI
+//@include "ui/main-panel.jsx"
 
 /**
  * Main function - entry point
@@ -62,17 +56,18 @@ function main() {
       return;
     }
     
-    // Load all script files
-    if (!loadScripts()) {
-      alert("Failed to load required script files");
-      return;
-    }
-    
     // Set Photoshop preferences for better automation
     app.displayDialogs = DialogModes.NO;
     
     // Show main panel
-    showMainPanel();
+    // Note: functions might be in global scope now
+    if (typeof showMainPanel === "function") {
+        showMainPanel();
+    } else if (typeof $.global.showMainPanel === "function") {
+        $.global.showMainPanel();
+    } else {
+        alert("Error: showMainPanel function not found!");
+    }
     
   } catch (e) {
     alert("Error: " + e.message + "\n\nLine: " + e.line);

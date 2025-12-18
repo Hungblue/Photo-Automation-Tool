@@ -23,25 +23,25 @@ function validateProductData(productData) {
   }
   
   // Validate product_id format
-  if (typeof productData.product_id !== "string" || productData.product_id.trim() === "") {
+  if (typeof productData.product_id !== "string" || productData.product_id.replace(/^\s+|\s+$/g, "") === "") {
     logError("validateProductData", "Invalid product_id");
     return false;
   }
   
   // Validate product_type
-  if (typeof productData.product_type !== "string" || productData.product_type.trim() === "") {
+  if (typeof productData.product_type !== "string" || productData.product_type.replace(/^\s+|\s+$/g, "") === "") {
     logError("validateProductData", "Invalid product_type");
     return false;
   }
   
   // Validate template_name
-  if (typeof productData.template_name !== "string" || productData.template_name.trim() === "") {
+  if (typeof productData.template_name !== "string" || productData.template_name.replace(/^\s+|\s+$/g, "") === "") {
     logError("validateProductData", "Invalid template_name");
     return false;
   }
   
   // Validate personalization
-  if (typeof productData.personalization !== "string" || productData.personalization.trim() === "") {
+  if (typeof productData.personalization !== "string" || productData.personalization.replace(/^\s+|\s+$/g, "") === "") {
     logError("validateProductData", "Invalid personalization");
     return false;
   }

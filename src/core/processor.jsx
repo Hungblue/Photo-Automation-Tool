@@ -7,7 +7,7 @@
  * @param {Object} productData - Product data object
  * @returns {Object} - Processing result
  */
-function processProduct(productData) {
+function processProduct(productData, scale) {
   var result = {
     product_id: productData.product_id,
     product_type: productData.product_type,
@@ -48,11 +48,10 @@ function processProduct(productData) {
     var personalization = parsePersonalization(productData.personalization);
     logInfo("Personalization parsed: " + Object.keys(personalization).length + " keys");
     
-    // 5. Process template using BaseTemplateHandler
-    var handler = new BaseTemplateHandler(doc, personalization);
-    var processResult = handler.process();
+    // 5. Process template using layer router
+    var processResult = routeToLayerHandler(doc, personalization);
     
-    logInfo("Processed keys: " + processResult.processedKeys.join(", "));
+    logInfo("Processed keys: " + processResult.processed.join(", "));
     if (processResult.errors.length > 0) {
       logWarning("Processing errors: " + processResult.errors.length);
       for (var i = 0; i < processResult.errors.length; i++) {
@@ -61,7 +60,7 @@ function processProduct(productData) {
     }
     
     // 6. Export PNG
-    var scale = 1.0; // Default scale, can be passed as parameter
+    scale = scale || 1.0;
     var outputPath = exportToPNG(doc, productData.product_id, productData.product_type, scale);
     
     if (!outputPath) {
@@ -116,8 +115,8 @@ function parsePersonalization(personalizationString) {
     for (var i = 0; i < pairs.length; i++) {
       var pair = pairs[i].split(":");
       if (pair.length === 2) {
-        var key = pair[0].trim();
-        var value = pair[1].trim();
+        var key = pair[0].replace(/^\s+|\s+$/g, "");
+        var value = pair[1].replace(/^\s+|\s+$/g, "");
         result[key] = value;
       } else {
         logWarning("Invalid personalization pair: " + pairs[i]);

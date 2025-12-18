@@ -199,7 +199,7 @@ function showMainPanel() {
         addLog("---");
         addLog("Processing: " + products[i].product_id);
         
-        var result = processProduct(products[i]);
+        var result = processProduct(products[i], scaleValue);
         results.push(result);
         
         if (result.status === "success") {

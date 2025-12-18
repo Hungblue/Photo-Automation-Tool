@@ -17,7 +17,10 @@ function readCSVFile(filePath) {
     }
     
     csvFile.encoding = "UTF-8";
-    csvFile.open("r");
+    if (!csvFile.open("r")) {
+      logError("readCSVFile", "Cannot open CSV file: " + filePath);
+      return [];
+    }
     
     var products = [];
     var headers = null;
@@ -27,17 +30,40 @@ function readCSVFile(filePath) {
       var line = csvFile.readln();
       lineNumber++;
       
-      if (line.trim() === "") continue;
+      // Skip if line is empty, null, or undefined
+      if (!line || line === null || line === undefined) {
+        continue;
+      }
+      
+      // Convert to string for safety
+      line = line.toString();
+      
+      // Check if line is valid string
+      if (typeof line !== "string") {
+        logWarning("Line " + lineNumber + " is not a string, skipping");
+        continue;
+      }
+      
+      // Trim and skip empty lines
+      var trimmedLine = line.replace(/^\s+|\s+$/g, ""); // Manual trim for safety
+      if (trimmedLine === "" || trimmedLine.length === 0) {
+        continue;
+      }
       
       if (!headers) {
         // First line is headers
-        headers = parseCSVLine(line);
+        headers = parseCSVLine(trimmedLine);
+        if (!headers || headers.length === 0) {
+          logError("readCSVFile", "Failed to parse CSV headers");
+          csvFile.close();
+          return [];
+        }
         logDebug("CSV Headers: " + headers.join(", "));
         continue;
       }
       
       // Parse data row
-      var values = parseCSVLine(line);
+      var values = parseCSVLine(trimmedLine);
       var product = parseCSVRow(headers, values);
       
       if (product && validateProductData(product)) {
@@ -72,16 +98,19 @@ function parseCSVLine(line) {
     if (ch === '"') {
       inQuotes = !inQuotes;
     } else if (ch === ',' && !inQuotes) {
-      fields.push(currentField.trim());
+      // Manual trim using regex
+      var trimmed = currentField.replace(/^\s+|\s+$/g, "");
+      fields.push(trimmed);
       currentField = "";
     } else {
       currentField += ch;
     }
   }
   
-  // Add last field
+  // Add last field (manual trim)
   if (currentField !== "") {
-    fields.push(currentField.trim());
+    var trimmed = currentField.replace(/^\s+|\s+$/g, "");
+    fields.push(trimmed);
   }
   
   return fields;
@@ -98,11 +127,12 @@ function parseCSVRow(headers, values) {
     var product = {};
     
     for (var i = 0; i < headers.length && i < values.length; i++) {
-      var header = headers[i].toLowerCase().trim();
-      var value = values[i].trim();
+      // Manual trim for both header and value
+      var header = headers[i].replace(/^\s+|\s+$/g, "").toLowerCase();
+      var value = values[i].replace(/^\s+|\s+$/g, "");
       
       // Remove quotes if present
-      if (value.charAt(0) === '"' && value.charAt(value.length - 1) === '"') {
+      if (value.length > 0 && value.charAt(0) === '"' && value.charAt(value.length - 1) === '"') {
         value = value.substring(1, value.length - 1);
       }
       
