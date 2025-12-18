@@ -1,0 +1,23 @@
+{
+  "s3": {
+    "baseUrl": "https://s3.amazonaws.com/your-bucket/templates/",
+    "enabled": true
+  },
+  "paths": {
+    "templates": "./templates",
+    "output": "./output",
+    "logs": "./logs",
+    "fonts": "./fonts"
+  },
+  "export": {
+    "format": "PNG",
+    "defaultScale": 1.0,
+    "scaleOptions": [1.0, 1.5, 2.0, 3.0],
+    "quality": 100,
+    "dpi": 300
+  },
+  "processing": {
+    "maxConcurrent": 5,
+    "logLevel": "info"
+  }
+}

@@ -1,0 +1,31 @@
+# .gitignore for Photoshop Tool
+
+# Output files
+output/
+*.png
+*.jpg
+*.jpeg
+*.psd~
+
+# Log files
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# Node modules (if any)
+node_modules/
+
+# Test templates (optional - uncomment if you don't want to track templates)
+templates/
+
+# Test data with sensitive info (optional)
+test-data/*.csv
