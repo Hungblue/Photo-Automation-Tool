@@ -98,7 +98,7 @@ function createGradient(colorArray) {
 }
 
 /**
- * Apply color range to text (gradient effect on characters)
+ * Apply color range to text (randomly per character)
  * @param {Document} doc - Photoshop document
  * @param {String} layerName - Layer name
  * @param {Array} colorArray - Array of hex colors
@@ -121,45 +121,6 @@ function applyColorRangeToText(doc, layerName, colorArray) {
       return false;
     }
     
-    // Apply colors to characters cyclically
-    for (var i = 0; i < charCount; i++) {
-      var colorIndex = i % colors.length;
-      layer.textItem.characters[i].color = colors[colorIndex];
-    }
-    
-    logInfo("Applied color range to " + charCount + " characters");
-    return true;
-    
-  } catch (e) {
-    logError("applyColorRangeToText", e);
-    return false;
-  }
-}
-
-/**
- * Apply color range to text (randomly per character)
- * @param {Document} doc - Photoshop document
- * @param {String} layerName - Layer name
- * @param {Array} colorArray - Array of hex colors
- */
-function applyRandomColorRangeToText(doc, layerName, colorArray) {
-  try {
-    var layer = findLayerByName(doc, layerName);
-    if (!layer || layer.kind !== LayerKind.TEXT) {
-      logError("applyRandomColorRangeToText", "Layer not found or not a text layer: " + layerName);
-      return false;
-    }
-    
-    var text = layer.textItem.contents;
-    var charCount = text.length;
-    
-    // Convert hex colors to SolidColor objects
-    var colors = createGradient(colorArray);
-    if (colors.length === 0) {
-      logError("applyRandomColorRangeToText", "No valid colors in array");
-      return false;
-    }
-    
     // Apply colors randomly to characters
     for (var i = 0; i < charCount; i++) {
         // Random index
@@ -177,6 +138,38 @@ function applyRandomColorRangeToText(doc, layerName, colorArray) {
 }
 
 /**
+ * Get color palette by name (returns array of Hex strings)
+ * @param {String} name - Palette name (e.g. "Rainbow")
+ */
+function getColorPalette(name) {
+    // Config is loaded globally in main.jsx
+    var config = $.global.COLOR_RANGES_CONFIG;
+    if (!config || !config[name]) return null;
+    
+    var rgbArray = config[name];
+    var hexArray = [];
+    
+    for (var i = 0; i < rgbArray.length; i++) {
+        var rgb = rgbArray[i];
+        if (Array.isArray(rgb) && rgb.length >= 3) {
+            hexArray.push(rgbToHex(rgb[0], rgb[1], rgb[2]));
+        }
+    }
+    
+    return hexArray;
+}
+
+/**
+ * Get color palette by name (returns array of RGB arrays [[r,g,b], ...])
+ * @param {String} name - Palette name (e.g. "Rainbow")
+ */
+function getRgbPalette(name) {
+    var config = $.global.COLOR_RANGES_CONFIG;
+    if (!config || !config[name]) return null;
+    return config[name]; // Returns [[r,g,b], ...]
+}
+
+/**
  * RGB to Hex converter (utility)
  */
 function rgbToHex(r, g, b) {
@@ -184,4 +177,191 @@ function rgbToHex(r, g, b) {
     ("0" + parseInt(r).toString(16)).slice(-2) +
     ("0" + parseInt(g).toString(16)).slice(-2) +
     ("0" + parseInt(b).toString(16)).slice(-2);
+}
+
+/**
+ * Get Text Layer Scale Factor from Transform Matrix
+ * @param {Layer} layer - Text layer
+ * @returns {Number} - Scale factor (default 1.0)
+ */
+function getLayerScaleFactor(layer) {
+    try {
+        app.activeDocument.activeLayer = layer;
+        var ref = new ActionReference();
+        ref.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
+        var desc = executeActionGet(ref);
+        var textKey = desc.getObjectValue(stringIDToTypeID("textKey"));
+        
+        if (textKey.hasKey(stringIDToTypeID("transform"))) {
+            var t = textKey.getObjectValue(stringIDToTypeID("transform"));
+            if (t.hasKey(stringIDToTypeID("yy"))) {
+                return t.getDouble(stringIDToTypeID("yy"));
+            }
+        }
+        return 1.0;
+    } catch(e) { return 1.0; }
+}
+
+// ============================================================================
+// ACTION MANAGER GRADIENT FUNCTIONS
+// ============================================================================
+
+/**
+ * Apply sequential gradient colors to text layer (letter by letter)
+ * Uses Action Manager for reliable per-character coloring
+ * @param {Document} doc - Photoshop document
+ * @param {String} layerName - Layer name
+ * @param {Array} palette - Array of RGB arrays [[r,g,b], ...]
+ * @param {Number} colorOffset - Offset for gradient (default 0)
+ */
+function applySequentialGradientToLayer(doc, layerName, palette, colorOffset) {
+    try {
+        var layer = findLayerByName(doc, layerName);
+        if (!layer || layer.kind !== LayerKind.TEXT) {
+            logError("applySequentialGradientToLayer", "Layer not found or not text: " + layerName);
+            return false;
+        }
+        
+        // Make the layer active
+        doc.activeLayer = layer;
+        
+        var textContent = layer.textItem.contents;
+        if (!textContent || textContent.length === 0) {
+            logWarning("applySequentialGradientToLayer", "Empty text content in layer: " + layerName);
+            return false;
+        }
+        
+        // --- CALCULATE CORRECT SIZE WITH MATRIX COMPENSATION ---
+        var baseSizeVal = layer.textItem.size.value;
+        var transformScale = getLayerScaleFactor(layer);
+        var targetSizeVal = baseSizeVal * transformScale;
+        
+        // logInfo("DEBUG: Base: " + baseSizeVal + ", Scale: " + transformScale + ", Target: " + targetSizeVal);
+
+        return applyGradientWithCalculatedSize(layer, textContent, palette, targetSizeVal, colorOffset || 0);
+        
+    } catch (e) {
+        logError("applySequentialGradientToLayer", e);
+        return false;
+    }
+}
+
+/**
+ * Core gradient application using Action Manager
+ * Preserves text formatting using logic from NP53tool.jsx
+ */
+function applyGradientWithCalculatedSize(layer, textContent, palette, targetSizeVal, colorOffset) {
+    try {
+        if (colorOffset === undefined || colorOffset === null) {
+            colorOffset = 0;
+        }
+        
+        // 1. Get current layer descriptor
+        var ref = new ActionReference();
+        ref.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
+        var layerDesc = executeActionGet(ref);
+        var textKey = layerDesc.getObjectValue(stringIDToTypeID("textKey"));
+
+        // 2. Backup Transform Matrix
+        var savedTransform = null;
+        if (textKey.hasKey(stringIDToTypeID("transform"))) {
+            savedTransform = textKey.getObjectValue(stringIDToTypeID("transform"));
+        }
+
+        // 3. Get Template Style (from first character)
+        var currentStyleList = textKey.getList(stringIDToTypeID("textStyleRange"));
+        var templateRange = currentStyleList.getObjectValue(0);
+        var templateStyle = templateRange.getObjectValue(stringIDToTypeID("textStyle"));
+
+        // 4. Build new style list with colors
+        var newStyleList = new ActionList();
+
+        for (var i = 0; i < textContent.length; i++) {
+            var paletteIndex = (colorOffset + i) % palette.length;
+            var rgb = palette[paletteIndex];
+            var charStyle = new ActionDescriptor();
+            
+            // --- Copy Attributes Safely (Reference Logic) ---
+            safeCopyString(templateStyle, charStyle, "fontPostScriptName");
+            safeCopyString(templateStyle, charStyle, "fontName");
+            
+            // Inject Size
+            charStyle.putUnitDouble(stringIDToTypeID("size"), charIDToTypeID("#Pnt"), targetSizeVal);
+            
+            safeCopyInteger(templateStyle, charStyle, "tracking");
+            safeCopyBoolean(templateStyle, charStyle, "autoKern");
+            safeCopyBoolean(templateStyle, charStyle, "syntheticBold");
+            safeCopyEnumerated(templateStyle, charStyle, "fontCaps");
+            safeCopyEnumerated(templateStyle, charStyle, "baseline");
+
+            // --- Set Color ---
+            var colorDesc = new ActionDescriptor();
+            colorDesc.putDouble(stringIDToTypeID("red"), rgb[0]);
+            colorDesc.putDouble(stringIDToTypeID("green"), rgb[1]);
+            colorDesc.putDouble(stringIDToTypeID("blue"), rgb[2]);
+            charStyle.putObject(stringIDToTypeID("color"), stringIDToTypeID("RGBColor"), colorDesc);
+
+            // --- Define Range ---
+            var rangeDesc = new ActionDescriptor();
+            rangeDesc.putInteger(stringIDToTypeID("from"), i);
+            rangeDesc.putInteger(stringIDToTypeID("to"), i + 1);
+            rangeDesc.putObject(stringIDToTypeID("textStyle"), stringIDToTypeID("textStyle"), charStyle);
+
+            newStyleList.putObject(stringIDToTypeID("textStyleRange"), rangeDesc);
+        }
+
+        // 5. Update textKey with new styles
+        textKey.putList(stringIDToTypeID("textStyleRange"), newStyleList);
+
+        // 6. Restore transform matrix
+        if (savedTransform) {
+            textKey.putObject(stringIDToTypeID("transform"), stringIDToTypeID("transform"), savedTransform);
+        }
+
+        // 7. Execute the action
+        var finalDesc = new ActionDescriptor();
+        var targetRef = new ActionReference();
+        targetRef.putEnumerated(stringIDToTypeID("textLayer"), stringIDToTypeID("ordinal"), stringIDToTypeID("targetEnum"));
+        finalDesc.putReference(stringIDToTypeID("null"), targetRef);
+        finalDesc.putObject(stringIDToTypeID("to"), stringIDToTypeID("textLayer"), textKey);
+
+        executeAction(charIDToTypeID("setd"), finalDesc, DialogModes.NO);
+        
+        logInfo("Applied sequential gradient to " + textContent.length + " characters");
+        return true;
+    } catch (e) {
+        logError("applyGradientWithCalculatedSize", e);
+        return false;
+    }
+}
+
+// ============================================================================
+// ACTION MANAGER HELPERS
+// ============================================================================
+function safeCopyString(src, dest, keyName) {
+    var id = stringIDToTypeID(keyName);
+    if (src.hasKey(id)) dest.putString(id, src.getString(id));
+}
+
+function safeCopyInteger(src, dest, keyName) {
+    var id = stringIDToTypeID(keyName);
+    if (src.hasKey(id)) dest.putInteger(id, src.getInteger(id));
+}
+
+function safeCopyBoolean(src, dest, keyName) {
+    var id = stringIDToTypeID(keyName);
+    if (src.hasKey(id)) {
+        if (keyName === "autoKern" && src.getType(id) === DescValueType.ENUMERATEDTYPE) {
+             dest.putEnumerated(id, src.getEnumerationType(id), src.getEnumerationValue(id));
+        } else {
+             dest.putBoolean(id, src.getBoolean(id));
+        }
+    } else if (keyName === "autoKern") {
+        dest.putBoolean(id, true);
+    }
+}
+
+function safeCopyEnumerated(src, dest, keyName) {
+    var id = stringIDToTypeID(keyName);
+    if (src.hasKey(id)) dest.putEnumerated(id, src.getEnumerationType(id), src.getEnumerationValue(id));
 }

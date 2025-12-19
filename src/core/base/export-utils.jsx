@@ -130,12 +130,45 @@ function createOutputFolder(productType) {
       productFolder.create();
     }
     
-    return productFolder.absoluteURI;
+    // Create timestamp subfolder (Batch ID)
+    var batchDate = $.global.batchTimestamp || new Date();
+    var timeStr = getTimestampFolderString(batchDate);
+    
+    var batchFolder = new Folder(productFolder.fsName + "/" + timeStr);
+    if (!batchFolder.exists) {
+        batchFolder.create();
+    }
+    
+    return batchFolder.absoluteURI;
     
   } catch (e) {
     logError("createOutputFolder", e);
     return null;
   }
+}
+
+/**
+ * Format date for folder name: YYYY-MM-DD_HH-mm-ss
+ */
+function getTimestampFolderString(date) {
+    try {
+        var y = date.getFullYear();
+        var m = date.getMonth() + 1;
+        var d = date.getDate();
+        var h = date.getHours();
+        var min = date.getMinutes();
+        var s = date.getSeconds();
+        
+        if (m < 10) m = "0" + m;
+        if (d < 10) d = "0" + d;
+        if (h < 10) h = "0" + h;
+        if (min < 10) min = "0" + min;
+        if (s < 10) s = "0" + s;
+        
+        return y + "-" + m + "-" + d + "_" + h + "-" + min + "-" + s;
+    } catch(e) {
+        return "batch_" + new Date().getTime();
+    }
 }
 
 /**

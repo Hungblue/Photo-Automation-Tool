@@ -4,6 +4,8 @@
 
 /**
  * Process hex color for 2-layers template
+ * Only applies to layer_print_1_name
+ * layer_cut_2_name is excluded from color changes
  */
 function processHexColor_2L(doc, personalization) {
   var results = {
@@ -17,27 +19,21 @@ function processHexColor_2L(doc, personalization) {
         key.indexOf("name_color") === 0 && 
         key.indexOf("name_color_range") === -1) {
       
-      var layerNames = getLayerNamesFromKey_2L(personalization, key);
+      // Target only layer_print_1_name (not print_2, cut_1, cut_2)
+      var targetLayer = "layer_print_1_name";
       var colorValue = personalization[key];
       
-      logDebug("2L Hex Color: Setting '" + colorValue + "' to layers: " + layerNames.join(", "));
+      logDebug("2L Hex Color: Setting '" + colorValue + "' to layer: " + targetLayer);
       
-      // Apply to both layers
-      var hasError = false;
-      for (var i = 0; i < layerNames.length; i++) {
-        var success = setTextColor(doc, layerNames[i], colorValue);
-        
-        if (!success) {
-          results.errors.push({
-            key: key,
-            error: "Color not applied: " + layerNames[i]
-          });
-          hasError = true;
-        }
-      }
+      var success = setTextColor(doc, targetLayer, colorValue);
       
-      if (!hasError) {
+      if (success) {
         results.processed.push(key);
+      } else {
+        results.errors.push({
+          key: key,
+          error: "Color not applied: " + targetLayer
+        });
       }
     }
   }

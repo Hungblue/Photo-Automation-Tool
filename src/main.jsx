@@ -39,6 +39,7 @@
 //@include "core/two-layers/image-handler.jsx"
 
 // Core Logic
+//@include "config/color-ranges.jsx"
 //@include "core/layer-router.jsx"
 //@include "core/processor.jsx"
 

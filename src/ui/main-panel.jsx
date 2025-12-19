@@ -186,6 +186,7 @@ function showMainPanel() {
       
       // Process products
       addLog("Starting batch processing...");
+      $.global.batchTimestamp = new Date();
       statusText.text = "Processing...";
       progressBar.value = 0;
       

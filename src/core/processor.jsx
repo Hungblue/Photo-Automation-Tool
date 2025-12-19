@@ -46,6 +46,10 @@ function processProduct(productData, scale) {
     
     // 4. Parse personalization string
     var personalization = parsePersonalization(productData.personalization);
+    
+    // Inject product_type into personalization for handlers that need it
+    personalization.product_type = productData.product_type;
+    
     logInfo("Personalization parsed: " + Object.keys(personalization).length + " keys");
     
     // 5. Process template using layer router

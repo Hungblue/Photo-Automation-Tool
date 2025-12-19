@@ -8,6 +8,13 @@
  * @param {String} layerName - Layer name
  * @param {String} imagePath - Path to new image
  */
+/**
+ * Replace image in layer using appropriate method for layer type
+ * Preserves original layer position and size
+ * @param {Document} doc - Photoshop document
+ * @param {String} layerName - Layer name
+ * @param {String} imagePath - Path to new image
+ */
 function replaceLayerImage(doc, layerName, imagePath) {
   try {
     var layer = findLayerByName(doc, layerName);
@@ -24,23 +31,103 @@ function replaceLayerImage(doc, layerName, imagePath) {
       return false;
     }
     
-    // Select the layer
     doc.activeLayer = layer;
+    var success = false;
     
-    // Place image using Action Manager (supports Smart Objects)
-    var idPlc = charIDToTypeID("Plc ");
-    var desc = new ActionDescriptor();
-    desc.putPath(charIDToTypeID("null"), imageFile);
-    desc.putBoolean(charIDToTypeID("Lnkd"), true); // Create Smart Object
-    executeAction(idPlc, desc, DialogModes.NO);
+    // Method 1: If Smart Object, use replace contents (preserves transform)
+    if (layer.kind === LayerKind.SMARTOBJECT) {
+       success = replaceSmartObject(layer, imageFile);
+    } 
+    // Method 2: If Raster/Normal, use Place -> Resize -> Move
+    else {
+       success = replaceRasterLayer(doc, layer, imageFile);
+    }
     
-    logInfo("Replaced image for layer '" + layerName + "' with: " + imagePath);
-    return true;
+    if (success) {
+      logInfo("Replaced image for layer '" + layerName + "' with: " + imageFile.name);
+    }
+    
+    return success;
     
   } catch (e) {
     logError("replaceLayerImage", e);
     return false;
   }
+}
+
+/**
+ * Replace Smart Object content (preserves transform)
+ */
+function replaceSmartObject(layer, file) {
+    try {
+        var idplacedLayerReplaceContents = stringIDToTypeID( "placedLayerReplaceContents" );
+        var desc = new ActionDescriptor();
+        desc.putPath( charIDToTypeID( "null" ), file );
+        executeAction( idplacedLayerReplaceContents, desc, DialogModes.NO );
+        return true;
+    } catch(e) {
+        logError("replaceSmartObject", e);
+        return false;
+    }
+}
+
+/**
+ * Replace Raster Layer content (manually preserves bounds)
+ */
+function replaceRasterLayer(doc, layer, file) {
+    try {
+        // 1. Save original bounds
+        var origBounds = layer.bounds;
+        var origLeft = origBounds[0].as("px");
+        var origTop = origBounds[1].as("px");
+        var origWidth = origBounds[2].as("px") - origLeft;
+        var origHeight = origBounds[3].as("px") - origTop;
+        
+        // 2. Place new image
+        var idPlc = charIDToTypeID("Plc ");
+        var desc = new ActionDescriptor();
+        desc.putPath(charIDToTypeID("null"), file);
+        desc.putBoolean(charIDToTypeID("Lnkd"), true); // Create Smart Object
+        executeAction(idPlc, desc, DialogModes.NO);
+        
+        // New layer is active
+        var newLayer = doc.activeLayer;
+        
+        // 3. Resize to match original dimensions
+        // Get new bounds
+        var newBounds = newLayer.bounds;
+        var newWidth = newBounds[2].as("px") - newBounds[0].as("px");
+        var newHeight = newBounds[3].as("px") - newBounds[1].as("px");
+        
+        if (newWidth > 0 && newHeight > 0 && origWidth > 0 && origHeight > 0) {
+            var scaleX = (origWidth / newWidth) * 100;
+            var scaleY = (origHeight / newHeight) * 100;
+            newLayer.resize(scaleX, scaleY, AnchorPosition.MIDDLECENTER);
+        }
+        
+        // 4. Move to original center
+        // Recalculate center of new layer
+        newBounds = newLayer.bounds;
+        var newLeft = newBounds[0].as("px");
+        var newTop = newBounds[1].as("px");
+        var newCenterX = newLeft + (newBounds[2].as("px") - newLeft)/2;
+        var newCenterY = newTop + (newBounds[3].as("px") - newTop)/2;
+        
+        var origCenterX = origLeft + origWidth/2;
+        var origCenterY = origTop + origHeight/2;
+        
+        newLayer.translate(origCenterX - newCenterX, origCenterY - newCenterY);
+        
+        // 5. Remove old layer
+        var oldName = layer.name;
+        layer.remove();
+        newLayer.name = oldName;
+        
+        return true;
+    } catch(e) {
+        logError("replaceRasterLayer", e);
+        return false;
+    }
 }
 
 /**

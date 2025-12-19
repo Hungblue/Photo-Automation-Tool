@@ -17,17 +17,23 @@ function processColorRange_1L(doc, personalization) {
     var layerName = personalization.layer_name || personalization.layer || "TextLayer";
     layerName = layerName.replace(/^[12]\s*/, ""); // Remove layer type prefix
     
-    var colorArray = personalization.name_color_range.split(",");
+    var rawValue = personalization.name_color_range;
+    var colorArray = getColorPalette(rawValue);
     
-    // Trim whitespace
-    for (var i = 0; i < colorArray.length; i++) {
-      colorArray[i] = colorArray[i].replace(/^\s+|\s+$/g, "");
+    if (colorArray) {
+        logDebug("1L Color Range: Using named palette '" + rawValue + "'");
+    } else {
+        colorArray = rawValue.split(",");
+        // Trim whitespace
+        for (var i = 0; i < colorArray.length; i++) {
+          colorArray[i] = colorArray[i].replace(/^\s+|\s+$/g, "");
+        }
     }
     
     logDebug("1L Color Range: Applying random gradient to '" + layerName + "'");
     
     // Use Random utility
-    var success = applyRandomColorRangeToText(doc, layerName, colorArray);
+    var success = applyColorRangeToText(doc, layerName, colorArray);
     
     if (success) {
       results.processed.push("name_color_range");
