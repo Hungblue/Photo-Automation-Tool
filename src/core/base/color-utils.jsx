@@ -361,7 +361,151 @@ function safeCopyBoolean(src, dest, keyName) {
     }
 }
 
+
+
 function safeCopyEnumerated(src, dest, keyName) {
     var id = stringIDToTypeID(keyName);
     if (src.hasKey(id)) dest.putEnumerated(id, src.getEnumerationType(id), src.getEnumerationValue(id));
+}
+
+
+/**
+ * Smartly apply color range (named palette or hex list) to layer
+ * Favors sequential gradient application using Action Manager
+ * @param {Document} doc - Photoshop document
+ * @param {String} layerName - Layer name
+ * @param {String} rawValue - Raw personalization value (palette name or comma-separated hex)
+ */
+function applySmartColorRange(doc, layerName, rawValue) {
+    var palette = getRgbPalette(rawValue);
+    var source = "named palette";
+    
+    if (!palette) {
+        source = "hex fallback";
+        // Fallback: comma-separated hex values
+        var hexArray = rawValue.split(",");
+        palette = [];
+        
+        for (var j = 0; j < hexArray.length; j++) {
+            var hex = hexArray[j].replace(/^\s+|\s+$/g, "").replace("#", "");
+            if (hex) {
+                 var r = parseInt(hex.substring(0, 2), 16) || 0;
+                 var g = parseInt(hex.substring(2, 4), 16) || 0;
+                 var b = parseInt(hex.substring(4, 6), 16) || 0;
+                 palette.push([r, g, b]);
+            }
+        }
+    }
+    
+    if (palette && palette.length > 0) {
+        logDebug("Applying " + source + " '" + rawValue + "' to " + layerName);
+        return applySequentialGradientToLayer(doc, layerName, palette, 0);
+    }
+    
+    return false;
+}
+
+/**
+ * Process color range logic for provided layer names
+ * Boilerplate wrapper for applying color range
+ * @param {Document} doc - Photoshop document
+ * @param {Object} personalization - Personalization object
+ * @param {Array} layerNames - List of layer names to target
+ */
+function processColorRangeLogic(doc, personalization, layerNames) {
+  var results = {
+    processed: [],
+    errors: []
+  };
+  
+  if (personalization.name_color_range) {
+    var successCount = 0;
+    
+    // Ensure array
+    if (typeof layerNames === "string") layerNames = [layerNames];
+    
+    for (var i = 0; i < layerNames.length; i++) {
+        var layerName = layerNames[i];
+        if (applySmartColorRange(doc, layerName, personalization.name_color_range)) {
+            successCount++;
+        } else {
+            results.errors.push({
+                key: "name_color_range",
+                error: "Color range not applied to: " + layerName
+            });
+        }
+    }
+    
+    if (successCount > 0) {
+        results.processed.push("name_color_range");
+    }
+  }
+  
+  return results;
+}
+
+/**
+ * Process hex color logic for provided layer names
+ * @param {Document} doc - Photoshop document
+ * @param {Object} personalization - Personalization object
+ * @param {Function|Array|String} layerTarget - Resolver for layer names (Function, Array, or String)
+ */
+function processColorHexLogic(doc, personalization, layerTarget) {
+  var results = {
+    processed: [],
+    errors: []
+  };
+  
+  for (var key in personalization) {
+    // Check for name_color prefix but exclude name_color_range
+    if (personalization.hasOwnProperty(key) && 
+        key.indexOf("name_color") === 0 && 
+        key.indexOf("name_color_range") === -1) {
+      
+      var layerNames = [];
+      
+      // Resolve target layers
+      if (typeof layerTarget === 'function') {
+         var res = layerTarget(personalization, key);
+         if (res) {
+             layerNames = Array.isArray(res) ? res : [res];
+         }
+      } else if (Array.isArray(layerTarget)) {
+         layerNames = layerTarget;
+      } else if (typeof layerTarget === 'string') {
+         layerNames = [layerTarget];
+      }
+      
+      var colorValue = personalization[key];
+      var colorObj = hexToRGB(colorValue);
+      var hasError = false;
+      
+      if (typeof logDebug === "function") {
+          logDebug("Hex Color: Setting '" + colorValue + "' to layers: " + layerNames.join(", "));
+      }
+      
+      for (var i = 0; i < layerNames.length; i++) {
+         var layerName = layerNames[i];
+         var layer = findLayerByName(doc, layerName);
+         
+         if (!layer) {
+             results.errors.push({key: key, error: "Layer not found: " + layerName});
+             hasError = true;
+             continue;
+         }
+         
+         var success = applyColorToLayer(layer, colorObj);
+         if (!success) {
+             results.errors.push({key: key, error: "Color not applied to: " + layerName});
+             hasError = true;
+         }
+      }
+      
+      if (!hasError && layerNames.length > 0) {
+          results.processed.push(key);
+      }
+    }
+  }
+  
+  return results;
 }

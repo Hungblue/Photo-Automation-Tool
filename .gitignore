@@ -2,14 +2,9 @@
 
 # Output files
 output/
-*.png
-*.jpg
-*.jpeg
-*.psd~
 
 # Log files
 logs/
-*.log
 
 # OS files
 .DS_Store
@@ -24,8 +19,11 @@ desktop.ini
 # Node modules (if any)
 node_modules/
 
-# Test templates (optional - uncomment if you don't want to track templates)
+# Files for templates and images
 templates/
+images/
 
-# Test data with sensitive info (optional)
-test-data/*.csv
+# Test data (optional)
+test-data/
+
+Plan/
