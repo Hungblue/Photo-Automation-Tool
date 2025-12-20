@@ -5,7 +5,7 @@
 /**
  * Process images for 1-layer template
  * Layer naming: L1, L2, etc.
- * Image path: images/{product_type}/L1.png
+ * Image path: ROOT/images/{product_type}/L1.png
  */
 function processImage_1L(doc, personalization) {
   var results = {
@@ -67,7 +67,7 @@ function processImage_1L(doc, personalization) {
  */
 function getImagesBasePath_1L() {
   var scriptFile = new File($.fileName);
-  // src/core/one-layer -> src/core -> src
-  var srcFolder = scriptFile.parent.parent.parent;
+  // src/core/one-layer -> src/core -> src -> root
+  var srcFolder = scriptFile.parent.parent.parent.parent;
   return srcFolder.fsName + "/images";
 }

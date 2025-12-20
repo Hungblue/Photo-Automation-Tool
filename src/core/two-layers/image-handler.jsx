@@ -5,7 +5,7 @@
 /**
  * Process images for 2-layers template
  * Layer naming: layer_print_1_image_1, layer_print_1_image_2, etc. (Sequential)
- * Image path: src/images/{product_type}/layer_print_1/{ImageID}.png
+ * Image path: images/{product_type}/layer_print_1/{ImageID}.png
  * CSV input: image:L4,L2 -> 
  *   layer_print_1_image_1 gets L4
  *   layer_print_1_image_2 gets L2
@@ -116,7 +116,7 @@ function findImageFile(folderPath, imageId) {
  */
 function getImagesBasePath() {
   var scriptFile = new File($.fileName);
-  // src/core/two-layers -> src/core -> src
-  var srcFolder = scriptFile.parent.parent.parent;
+  // src/core/two-layers -> src/core -> src -> root
+  var srcFolder = scriptFile.parent.parent.parent.parent;
   return srcFolder.fsName + "/images";
 }
