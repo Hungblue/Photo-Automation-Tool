@@ -47,8 +47,9 @@ function processProduct(productData, scale) {
     // 4. Parse personalization string
     var personalization = parsePersonalization(productData.personalization);
     
-    // Inject product_type into personalization for handlers that need it
+    // Inject product_type and template_name into personalization for handlers that need it
     personalization.product_type = productData.product_type;
+    personalization.template_name = productData.template_name;
     
     logInfo("Personalization parsed: " + Object.keys(personalization).length + " keys");
     

@@ -509,3 +509,76 @@ function processColorHexLogic(doc, personalization, layerTarget) {
   
   return results;
 }
+
+/**
+ * Special handling for NP53 "Letter Max 16+8 elements" (Multi-line Gradient)
+ * Splits name into 2 lines, applies sequential gradient to layer_print_1_name_1 and layer_print_1_name_2,
+ * and sets formatted text (with \r) to layer_cut_2_name.
+ * 
+ * @param {Document} doc - Photoshop document
+ * @param {String} text - Full name text
+ * @param {String} paletteName - Color palette name
+ */
+function processNP53MultiLineGradient(doc, text, paletteName) {
+    if (!text || !paletteName) return false;
+
+    var colorPalette = getRgbPalette(paletteName);
+    if (!colorPalette) {
+        logWarning("processNP53MultiLineGradient", "Palette not found: " + paletteName);
+        return false;
+    }
+
+    // Split text into two parts at the first whitespace to maintain consistency with formatting logic
+    var parts = text.split(/\s+/);
+    var line1 = parts[0] || "";
+    var line2 = parts.slice(1).join(" ");
+    
+    if (typeof logDebug === "function") {
+        logDebug("NP53 Multi-line: Line 1: '" + line1 + "', Line 2: '" + line2 + "'");
+    }
+
+    // --- Process layer_print_1_name_1 (Line 1) ---
+    var name1Layer = findLayerByName(doc, "layer_print_1_name_1");
+    if (name1Layer && name1Layer.kind === LayerKind.TEXT) {
+        var baseSizeVal = name1Layer.textItem.size.value;
+        var transformScale = getLayerScaleFactor(name1Layer);
+        var calculatedTargetSize = baseSizeVal * transformScale;
+        
+        name1Layer.textItem.contents = line1;
+        doc.activeLayer = name1Layer;
+        
+        // Offset 0 for first line
+        applyGradientWithCalculatedSize(name1Layer, line1, colorPalette, calculatedTargetSize, 0);
+    } else {
+        if (typeof logWarning === "function") logWarning("Layer 'layer_print_1_name_1' not found for multi-line processing.");
+    }
+
+    // --- Process layer_print_1_name_2 (Line 2) ---
+    var name2Layer = findLayerByName(doc, "layer_print_1_name_2");
+    if (name2Layer && name2Layer.kind === LayerKind.TEXT) {
+        var baseSizeVal2 = name2Layer.textItem.size.value;
+        var transformScale2 = getLayerScaleFactor(name2Layer);
+        var calculatedTargetSize2 = baseSizeVal2 * transformScale2;
+        
+        name2Layer.textItem.contents = line2;
+        doc.activeLayer = name2Layer;
+        
+        // Offset starts after line 1
+        var colorOffset = line1.length;
+        applyGradientWithCalculatedSize(name2Layer, line2, colorPalette, calculatedTargetSize2, colorOffset);
+    } else {
+        // Line 2 might not always exist or be required, but warn if missing
+        if (typeof logWarning === "function") logWarning("Layer 'layer_print_1_name_2' not found for multi-line processing.");
+    }
+
+    // --- Process layer_cut_2_name (Formatted Text) ---
+    var cutLayer = findLayerByName(doc, "layer_cut_2_name");
+    if (cutLayer && cutLayer.kind === LayerKind.TEXT) {
+        // Replace first space with return for standard text layer formatting
+        // "Harrison Golden" -> "Harrison\rGolden"
+        var formattedText = text.replace(/\s+/, '\r');
+        cutLayer.textItem.contents = formattedText;
+    }
+    
+    return true;
+}
