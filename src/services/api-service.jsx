@@ -2,88 +2,44 @@
 // API Service - Handle API calls and data parsing
 // ============================================
 
+// Include fake API data
+//@include "../data/fake-api-data.jsx"
+
 /**
  * Fetch products from API
  * @param {Number} limit - Number of products to fetch
+ * @param {String} productType - Optional product type filter
  * @returns {Array} - Array of product objects
  */
-function fetchProductsFromAPI(limit) {
+function fetchProductsFromAPI(limit, productType) {
   limit = limit || 10;
   
   try {
     logInfo("Fetching " + limit + " products from API...");
     
     // TODO: Implement actual API call when endpoint is available
-    // For now, return mock data
-    var mockData = generateMockAPIData(limit);
+    // For now, return fake data from fake-api-data.jsx
+    var fakeData;
     
-    logInfo("Fetched " + mockData.length + " products");
-    return mockData;
+    if (productType) {
+      fakeData = getFakeProductsByType(productType);
+      logInfo("Filtered by product type: " + productType);
+    } else {
+      fakeData = getAllFakeProducts();
+    }
+    
+    // Apply limit
+    if (fakeData.length > limit) {
+      fakeData = fakeData.slice(0, limit);
+    }
+    
+    logInfo("Fetched " + fakeData.length + " products");
+    return fakeData;
     
   } catch (e) {
     logError("fetchProductsFromAPI", e);
     return [];
   }
-}
-
-/**
- * Generate mock API data for testing
- */
-function generateMockAPIData(count) {
-  var products = [];
-  var productTypes = ["NP53", "NP54", "CF750"];
-  
-  for (var i = 0; i < count; i++) {
-    var productType = productTypes[i % productTypes.length];
-    var productId = "P" + (1000 + i);
-    
-    var product = {
-      product_id: productId,
-      product_type: productType,
-      template_name: "template_1.psd",
-      personalization: generateMockPersonalization(productType, i)
-    };
-    
-    products.push(product);
-  }
-  
-  return products;
-}
-
-/**
- * Generate mock personalization string
- */
-function generateMockPersonalization(productType, index) {
-  var names = ["John Doe", "Jane Smith", "Bob Johnson", "Alice Williams", "Charlie Brown"];
-  var fonts = ["Arial-BoldMT", "TimesNewRomanPS-BoldMT", "Helvetica-Bold"];
-  var colors = ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF"];
-  
-  var name = names[index % names.length];
-  var font = fonts[index % fonts.length];
-  var color = colors[index % colors.length];
-  
-  // Basic personalization
-  var parts = [
-    "layer:TextLayer",
-    "name_text:" + name,
-    "name_font:" + font,
-    "name_color:" + color,
-    "name_size:24"
-  ];
-  
-  // Add color range for some products
-  if (index % 3 === 0) {
-    parts.push("name_color_range:#FF0000,#00FF00,#0000FF");
-  }
-  
-  // Add multiple text fields for some products
-  if (index % 2 === 0) {
-    parts.push("name_text_1:Subtitle " + index);
-    parts.push("name_font_1:Arial");
-    parts.push("name_color_1:#000000");
-  }
-  
-  return parts.join("|");
 }
 
 /**

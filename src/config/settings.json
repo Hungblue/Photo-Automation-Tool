@@ -12,7 +12,7 @@
   "export": {
     "format": "PNG",
     "defaultScale": 1.0,
-    "scaleOptions": [1.0, 1.5, 2.0, 3.0],
+    "scaleOptions": [0.5,1.0, 1.5, 2.0, 3.0],
     "quality": 100,
     "dpi": 300
   },

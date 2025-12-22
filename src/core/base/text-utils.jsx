@@ -228,3 +228,154 @@ function getStandardTextLayerNames(personalization, key) {
   
   return layerNames;
 }
+
+// ============================================
+// Shared Logic Functions (for handlers)
+// ============================================
+
+/**
+ * Process font logic for provided layer target
+ * @param {Document} doc - Photoshop document
+ * @param {Object} personalization - Personalization object
+ * @param {Function|Array|String} layerTarget - Layer name(s) or resolver function
+ */
+function processFontLogic(doc, personalization, layerTarget) {
+  var results = {
+    processed: [],
+    errors: []
+  };
+  
+  for (var key in personalization) {
+    if (!personalization.hasOwnProperty(key)) continue;
+    if (key.indexOf("name_font") !== 0) continue;
+    
+    var fontName = personalization[key];
+    var layerNames = resolveLayerTarget(layerTarget, personalization, key);
+    
+    if (typeof logDebug === "function") {
+      logDebug("Font: Setting '" + fontName + "' to layers: " + layerNames.join(", "));
+    }
+    
+    var hasError = false;
+    for (var i = 0; i < layerNames.length; i++) {
+      var success = setTextFont(doc, layerNames[i], fontName);
+      if (!success) {
+        results.errors.push({key: key, error: "Font not applied: " + layerNames[i]});
+        hasError = true;
+      }
+    }
+    
+    if (!hasError && layerNames.length > 0) {
+      results.processed.push(key);
+    }
+  }
+  
+  return results;
+}
+
+/**
+ * Process size logic for provided layer target
+ * @param {Document} doc - Photoshop document
+ * @param {Object} personalization - Personalization object
+ * @param {Function|Array|String} layerTarget - Layer name(s) or resolver function
+ */
+function processSizeLogic(doc, personalization, layerTarget) {
+  var results = {
+    processed: [],
+    errors: []
+  };
+  
+  for (var key in personalization) {
+    if (!personalization.hasOwnProperty(key)) continue;
+    if (key.indexOf("name_size") !== 0) continue;
+    
+    var sizeValue = parseInt(personalization[key]);
+    if (isNaN(sizeValue)) {
+      results.errors.push({key: key, error: "Invalid size value: " + personalization[key]});
+      continue;
+    }
+    
+    var layerNames = resolveLayerTarget(layerTarget, personalization, key);
+    
+    if (typeof logDebug === "function") {
+      logDebug("Size: Setting " + sizeValue + "pt to layers: " + layerNames.join(", "));
+    }
+    
+    var hasError = false;
+    for (var i = 0; i < layerNames.length; i++) {
+      var success = setTextSize(doc, layerNames[i], sizeValue);
+      if (!success) {
+        results.errors.push({key: key, error: "Size not applied: " + layerNames[i]});
+        hasError = true;
+      }
+    }
+    
+    if (!hasError && layerNames.length > 0) {
+      results.processed.push(key);
+    }
+  }
+  
+  return results;
+}
+
+/**
+ * Process text logic for provided layer target
+ * @param {Document} doc - Photoshop document
+ * @param {Object} personalization - Personalization object
+ * @param {Function|Array|String} layerTarget - Layer name(s) or resolver function
+ */
+function processTextLogic(doc, personalization, layerTarget) {
+  var results = {
+    processed: [],
+    errors: []
+  };
+  
+  for (var key in personalization) {
+    if (!personalization.hasOwnProperty(key)) continue;
+    if (key.indexOf("name_text") !== 0) continue;
+    
+    var text = personalization[key];
+    var layerNames = resolveLayerTarget(layerTarget, personalization, key);
+    
+    if (typeof logDebug === "function") {
+      logDebug("Text: Setting '" + text + "' to layers: " + layerNames.join(", "));
+    }
+    
+    var hasError = false;
+    for (var i = 0; i < layerNames.length; i++) {
+      var success = setTextContent(doc, layerNames[i], text);
+      if (!success) {
+        results.errors.push({key: key, error: "Text not applied: " + layerNames[i]});
+        hasError = true;
+      }
+    }
+    
+    if (!hasError && layerNames.length > 0) {
+      results.processed.push(key);
+    }
+  }
+  
+  return results;
+}
+
+/**
+ * Resolve layer target to array of layer names
+ * @param {Function|Array|String} layerTarget - Layer target
+ * @param {Object} personalization - Personalization object
+ * @param {String} key - Current key being processed
+ * @returns {Array} - Array of layer names
+ */
+function resolveLayerTarget(layerTarget, personalization, key) {
+  if (typeof layerTarget === "function") {
+    var result = layerTarget(personalization, key);
+    if (typeof result === "string") return [result];
+    return result || [];
+  }
+  if (typeof layerTarget === "string") {
+    return [layerTarget];
+  }
+  if (Array.isArray(layerTarget)) {
+    return layerTarget;
+  }
+  return [];
+}
