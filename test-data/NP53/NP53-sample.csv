@@ -1,4 +1,0 @@
-product_id,product_type,template_name,personalization
-P1001,NP53,4-letters-2-elements.psd,"layer:2|name_text:John|name_color_range:Rainbow|image:L1,L4"
-P1002,NP53,8-letters-8-elements.psd,"layer:2|name_text:Jonathan|name_color_range:New Pastel Rainbow|image:L11, L18, L16, L1, L21, L5, L19, L20"
-P1003,NP53,16-letters-8-elements.psd,"layer:2|name_text:Harrison Golden|name_color_range: Gold Pink|image:L11, L18, L16, L1, L21, L5, L19, L21"
