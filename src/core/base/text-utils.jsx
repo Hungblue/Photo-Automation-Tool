@@ -36,7 +36,7 @@ function setTextContent(doc, layerName, text) {
  * Set font for text layer
  * @param {Document} doc - Photoshop document
  * @param {String} layerName - Layer name
- * @param {String} fontName - Font name (e.g., "Arial-BoldMT")
+ * @param {String} fontName - Font name (display name or PostScript name)
  */
 function setTextFont(doc, layerName, fontName) {
   try {
@@ -47,19 +47,80 @@ function setTextFont(doc, layerName, fontName) {
       return false;
     }
     
-    // Check if font exists
-    if (!isFontAvailable(fontName)) {
-      logWarning("Font not available: " + fontName + ", using default");
-      // Don't fail, just log warning
+    // Try to resolve the font - could be display name or PostScript name
+    var resolvedFont = resolveFontName(fontName);
+    
+    if (!resolvedFont) {
+      logWarning("Font not found in system: '" + fontName + "' - layer '" + layerName + "' will keep default font");
+      return false;
     }
     
-    layer.textItem.font = fontName;
-    logDebug("Set font for layer '" + layerName + "': " + fontName);
+    // Log the resolved font
+    if (resolvedFont !== fontName) {
+      logInfo("Font resolved: '" + fontName + "' -> PostScript: '" + resolvedFont + "'");
+    }
+    
+    // Apply the font
+    layer.textItem.font = resolvedFont;
+    
+    // Verify the font was applied
+    var appliedFont = layer.textItem.font;
+    if (appliedFont !== resolvedFont) {
+      logWarning("Font verification failed: expected '" + resolvedFont + "' but got '" + appliedFont + "'");
+      return false;
+    }
+    
+    logDebug("Set font for layer '" + layerName + "': " + resolvedFont);
     return true;
     
   } catch (e) {
     logError("setTextFont", e);
     return false;
+  }
+}
+
+/**
+ * Resolve font name to PostScript name
+ * @param {String} fontName - Display name or PostScript name
+ * @returns {String|null} - PostScript name or null if not found
+ */
+function resolveFontName(fontName) {
+  try {
+    var fonts = app.fonts;
+    
+    // First pass: exact match on PostScript name
+    for (var i = 0; i < fonts.length; i++) {
+      if (fonts[i].postScriptName === fontName) {
+        return fonts[i].postScriptName;
+      }
+    }
+    
+    // Second pass: match on display name (family + style or just family)
+    for (var j = 0; j < fonts.length; j++) {
+      if (fonts[j].name === fontName || fonts[j].family === fontName) {
+        return fonts[j].postScriptName;
+      }
+    }
+    
+    // Third pass: case-insensitive partial match
+    var lowerFontName = fontName.toLowerCase().replace(/[\s\-_]/g, "");
+    for (var k = 0; k < fonts.length; k++) {
+      var lowerPostScript = fonts[k].postScriptName.toLowerCase().replace(/[\s\-_]/g, "");
+      var lowerName = fonts[k].name.toLowerCase().replace(/[\s\-_]/g, "");
+      var lowerFamily = fonts[k].family.toLowerCase().replace(/[\s\-_]/g, "");
+      
+      if (lowerPostScript === lowerFontName || 
+          lowerName === lowerFontName || 
+          lowerFamily === lowerFontName) {
+        logDebug("Font matched (fuzzy): '" + fontName + "' -> '" + fonts[k].postScriptName + "'");
+        return fonts[k].postScriptName;
+      }
+    }
+    
+    return null;
+  } catch (e) {
+    logError("resolveFontName", e);
+    return null;
   }
 }
 
@@ -252,6 +313,11 @@ function processFontLogic(doc, personalization, layerTarget) {
     var fontName = personalization[key];
     var layerNames = resolveLayerTarget(layerTarget, personalization, key);
     
+    // Log when font is found
+    if (typeof logInfo === "function") {
+      logInfo("Font found: '" + fontName + "' (key: " + key + ")");
+    }
+    
     if (typeof logDebug === "function") {
       logDebug("Font: Setting '" + fontName + "' to layers: " + layerNames.join(", "));
     }
@@ -262,6 +328,10 @@ function processFontLogic(doc, personalization, layerTarget) {
       if (!success) {
         results.errors.push({key: key, error: "Font not applied: " + layerNames[i]});
         hasError = true;
+      } else {
+        if (typeof logInfo === "function") {
+          logInfo("Font applied successfully: '" + fontName + "' to layer '" + layerNames[i] + "'");
+        }
       }
     }
     

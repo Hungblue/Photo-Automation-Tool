@@ -78,6 +78,156 @@ function applyColorToCharRange(layer, color, startIndex, endIndex) {
 }
 
 /**
+ * Apply stroke (outline) color to layer via layer effects
+ * Uses Action Manager to modify layer style stroke color
+ * @param {Layer} layer - Target layer
+ * @param {SolidColor} color - Color to apply to stroke
+ * @returns {Boolean} - Success status
+ */
+function applyStrokeColorToLayer(layer, color) {
+  try {
+    if (!layer) {
+      logError("applyStrokeColorToLayer", "Layer is null");
+      return false;
+    }
+    
+    // Make layer active
+    app.activeDocument.activeLayer = layer;
+    
+    // Get layer descriptor to check if it has stroke effect
+    var ref = new ActionReference();
+    ref.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
+    var layerDesc = executeActionGet(ref);
+    
+    // Check if layer has effects
+    if (!layerDesc.hasKey(stringIDToTypeID("layerEffects"))) {
+      logWarning("applyStrokeColorToLayer", "Layer has no effects, cannot apply stroke color");
+      return false;
+    }
+    
+    var effects = layerDesc.getObjectValue(stringIDToTypeID("layerEffects"));
+    
+    // Check if layer has stroke effect (frameFX)
+    if (!effects.hasKey(stringIDToTypeID("frameFX"))) {
+      logWarning("applyStrokeColorToLayer", "Layer has no stroke effect");
+      return false;
+    }
+    
+    // Build action descriptor to set stroke color
+    var desc = new ActionDescriptor();
+    var ref2 = new ActionReference();
+    ref2.putProperty(charIDToTypeID("Prpr"), charIDToTypeID("Lefx"));
+    ref2.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
+    desc.putReference(charIDToTypeID("null"), ref2);
+    
+    // Create layer effects descriptor
+    var effectsDesc = new ActionDescriptor();
+    effectsDesc.putUnitDouble(stringIDToTypeID("scale"), charIDToTypeID("#Prc"), 100);
+    
+    // Create stroke (frameFX) descriptor
+    var strokeDesc = new ActionDescriptor();
+    strokeDesc.putBoolean(stringIDToTypeID("enabled"), true);
+    strokeDesc.putBoolean(stringIDToTypeID("present"), true);
+    strokeDesc.putBoolean(stringIDToTypeID("showInDialog"), true);
+    
+    // Set stroke color
+    var colorDesc = new ActionDescriptor();
+    colorDesc.putDouble(charIDToTypeID("Rd  "), color.rgb.red);
+    colorDesc.putDouble(charIDToTypeID("Grn "), color.rgb.green);
+    colorDesc.putDouble(charIDToTypeID("Bl  "), color.rgb.blue);
+    strokeDesc.putObject(charIDToTypeID("Clr "), charIDToTypeID("RGBC"), colorDesc);
+    
+    // Copy other stroke properties from existing effect
+    var existingStroke = effects.getObjectValue(stringIDToTypeID("frameFX"));
+    
+    // Copy paint type
+    if (existingStroke.hasKey(stringIDToTypeID("paintType"))) {
+      strokeDesc.putEnumerated(stringIDToTypeID("paintType"), 
+        existingStroke.getEnumerationType(stringIDToTypeID("paintType")),
+        existingStroke.getEnumerationValue(stringIDToTypeID("paintType")));
+    } else {
+      strokeDesc.putEnumerated(stringIDToTypeID("paintType"), stringIDToTypeID("frameFill"), stringIDToTypeID("solidColor"));
+    }
+    
+    // Copy style (inside/outside/center)
+    if (existingStroke.hasKey(stringIDToTypeID("style"))) {
+      strokeDesc.putEnumerated(stringIDToTypeID("style"),
+        existingStroke.getEnumerationType(stringIDToTypeID("style")),
+        existingStroke.getEnumerationValue(stringIDToTypeID("style")));
+    }
+    
+    // Copy size
+    if (existingStroke.hasKey(stringIDToTypeID("size"))) {
+      strokeDesc.putUnitDouble(stringIDToTypeID("size"), charIDToTypeID("#Pxl"), 
+        existingStroke.getUnitDoubleValue(stringIDToTypeID("size")));
+    }
+    
+    // Copy opacity
+    if (existingStroke.hasKey(stringIDToTypeID("opacity"))) {
+      strokeDesc.putUnitDouble(stringIDToTypeID("opacity"), charIDToTypeID("#Prc"),
+        existingStroke.getUnitDoubleValue(stringIDToTypeID("opacity")));
+    }
+    
+    // Copy blend mode
+    if (existingStroke.hasKey(stringIDToTypeID("mode"))) {
+      strokeDesc.putEnumerated(stringIDToTypeID("mode"),
+        existingStroke.getEnumerationType(stringIDToTypeID("mode")),
+        existingStroke.getEnumerationValue(stringIDToTypeID("mode")));
+    }
+    
+    // Add stroke to effects
+    effectsDesc.putObject(stringIDToTypeID("frameFX"), stringIDToTypeID("frameFX"), strokeDesc);
+    
+    // Execute the action
+    desc.putObject(charIDToTypeID("T   "), charIDToTypeID("Lefx"), effectsDesc);
+    executeAction(charIDToTypeID("setd"), desc, DialogModes.NO);
+    
+    logInfo("Applied stroke color to layer: " + layer.name);
+    return true;
+    
+  } catch (e) {
+    logError("applyStrokeColorToLayer", e);
+    return false;
+  }
+}
+
+/**
+ * Check if a font name indicates Bartex font
+ * @param {String} fontName - Font name to check
+ * @returns {Boolean} - True if font is Bartex
+ */
+function isBartexFont(fontName) {
+  if (!fontName) return false;
+  var lowerName = fontName.toLowerCase();
+  return lowerName.indexOf("bartex") !== -1;
+}
+
+/**
+ * Get the current font name from personalization object
+ * Checks name_font key
+ * @param {Object} personalization - Personalization object
+ * @returns {String|null} - Font name or null
+ */
+function getCurrentFontFromPersonalization(personalization) {
+  if (!personalization) return null;
+  
+  // Check name_font first (most common)
+  if (personalization.name_font) {
+    return personalization.name_font;
+  }
+  
+  // Check for indexed font keys (name_font_1, etc.)
+  for (var key in personalization) {
+    if (personalization.hasOwnProperty(key) && key.indexOf("name_font") === 0) {
+      return personalization[key];
+    }
+  }
+  
+  return null;
+}
+
+
+/**
  * Create gradient from multiple colors
  * @param {Array} colorArray - Array of hex colors
  * @returns {Array} - Array of SolidColor objects
@@ -446,6 +596,7 @@ function processColorRangeLogic(doc, personalization, layerNames) {
 
 /**
  * Process hex color logic for provided layer names
+ * Special handling for Bartex font: only change stroke color, not text color
  * @param {Document} doc - Photoshop document
  * @param {Object} personalization - Personalization object
  * @param {Function|Array|String} layerTarget - Resolver for layer names (Function, Array, or String)
@@ -455,6 +606,14 @@ function processColorHexLogic(doc, personalization, layerTarget) {
     processed: [],
     errors: []
   };
+  
+  // Check if current font is Bartex - special handling required
+  var currentFont = getCurrentFontFromPersonalization(personalization);
+  var isBartex = isBartexFont(currentFont);
+  
+  if (isBartex && typeof logInfo === "function") {
+    logInfo("Bartex font detected: '" + currentFont + "' - applying stroke color only (not text color)");
+  }
   
   for (var key in personalization) {
     // Check for name_color prefix but exclude name_color_range
@@ -481,7 +640,11 @@ function processColorHexLogic(doc, personalization, layerTarget) {
       var hasError = false;
       
       if (typeof logDebug === "function") {
-          logDebug("Hex Color: Setting '" + colorValue + "' to layers: " + layerNames.join(", "));
+          if (isBartex) {
+              logDebug("Bartex Mode - Stroke Color: Setting '" + colorValue + "' to layers: " + layerNames.join(", "));
+          } else {
+              logDebug("Hex Color: Setting '" + colorValue + "' to layers: " + layerNames.join(", "));
+          }
       }
       
       for (var i = 0; i < layerNames.length; i++) {
@@ -494,10 +657,26 @@ function processColorHexLogic(doc, personalization, layerTarget) {
              continue;
          }
          
-         var success = applyColorToLayer(layer, colorObj);
-         if (!success) {
-             results.errors.push({key: key, error: "Color not applied to: " + layerName});
-             hasError = true;
+         var success = false;
+         
+         // Bartex font: only apply stroke color, skip text color
+         if (isBartex) {
+             success = applyStrokeColorToLayer(layer, colorObj);
+             if (!success) {
+                 // Log warning but don't treat as error - layer might not have stroke effect
+                 if (typeof logWarning === "function") {
+                     logWarning("Bartex mode: Could not apply stroke color to '" + layerName + "' (layer may not have stroke effect)");
+                 }
+                 // Still mark as success since this is expected behavior
+                 success = true;
+             }
+         } else {
+             // Normal mode: apply text color
+             success = applyColorToLayer(layer, colorObj);
+             if (!success) {
+                 results.errors.push({key: key, error: "Color not applied to: " + layerName});
+                 hasError = true;
+             }
          }
       }
       
