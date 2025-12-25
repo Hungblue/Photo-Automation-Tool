@@ -402,25 +402,40 @@ function processTextLogic(doc, personalization, layerTarget) {
   
   for (var key in personalization) {
     if (!personalization.hasOwnProperty(key)) continue;
-    if (key.indexOf("name_text") !== 0) continue;
+    // Chỉ chấp nhận key = 'name_text' hoặc 'name_text_1', 'name_text_2', 'name_text_3', ...
+    if (key !== "name_text" && !/^name_text_\d+$/.test(key)) continue;
     
     var text = personalization[key];
     var layerNames = resolveLayerTarget(layerTarget, personalization, key);
     
+    // Trích xuất suffix số từ key (vd: name_text_1 -> _1, name_text_2 -> _2)
+    // Nếu key = 'name_text' thì suffix = ''
+    var suffix = '';
+    var suffixMatch = key.match(/^name_text(_\d+)$/);
+    if (suffixMatch) {
+      suffix = suffixMatch[1]; // vd: '_1', '_2', '_3'
+    }
+    
+    // Thêm suffix vào tất cả layer names
+    var finalLayerNames = [];
+    for (var j = 0; j < layerNames.length; j++) {
+      finalLayerNames.push(layerNames[j] + suffix);
+    }
+    
     if (typeof logDebug === "function") {
-      logDebug("Text: Setting '" + text + "' to layers: " + layerNames.join(", "));
+      logDebug("Text: Setting '" + text + "' to layers: " + finalLayerNames.join(", "));
     }
     
     var hasError = false;
-    for (var i = 0; i < layerNames.length; i++) {
-      var success = setTextContent(doc, layerNames[i], text);
+    for (var i = 0; i < finalLayerNames.length; i++) {
+      var success = setTextContent(doc, finalLayerNames[i], text);
       if (!success) {
-        results.errors.push({key: key, error: "Text not applied: " + layerNames[i]});
+        results.errors.push({key: key, error: "Text not applied: " + finalLayerNames[i]});
         hasError = true;
       }
     }
     
-    if (!hasError && layerNames.length > 0) {
+    if (!hasError && finalLayerNames.length > 0) {
       results.processed.push(key);
     }
   }

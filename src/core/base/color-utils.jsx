@@ -568,26 +568,53 @@ function processColorRangeLogic(doc, personalization, layerNames) {
     errors: []
   };
   
-  if (personalization.name_color_range) {
-    var successCount = 0;
+  for (var key in personalization) {
+    if (!personalization.hasOwnProperty(key)) continue;
+    // Chỉ chấp nhận key = 'name_color_range' hoặc 'name_color_range_1', 'name_color_range_2', ...
+    if (key !== "name_color_range" && !/^name_color_range_\d+$/.test(key)) continue;
     
-    // Ensure array
-    if (typeof layerNames === "string") layerNames = [layerNames];
+    var colorRangeValue = personalization[key];
     
-    for (var i = 0; i < layerNames.length; i++) {
-        var layerName = layerNames[i];
-        if (applySmartColorRange(doc, layerName, personalization.name_color_range)) {
-            successCount++;
-        } else {
-            results.errors.push({
-                key: "name_color_range",
-                error: "Color range not applied to: " + layerName
-            });
-        }
+    // Trích xuất suffix số từ key (vd: name_color_range_1 -> _1, name_color_range_2 -> _2)
+    // Nếu key = 'name_color_range' thì suffix = ''
+    var suffix = '';
+    var suffixMatch = key.match(/^name_color_range(_\d+)$/);
+    if (suffixMatch) {
+      suffix = suffixMatch[1]; // vd: '_1', '_2', '_3'
     }
     
-    if (successCount > 0) {
-        results.processed.push("name_color_range");
+    // Ensure array
+    var targetLayers = layerNames;
+    if (typeof targetLayers === "string") targetLayers = [targetLayers];
+    
+    // Thêm suffix vào tất cả layer names
+    var finalLayerNames = [];
+    for (var j = 0; j < targetLayers.length; j++) {
+      finalLayerNames.push(targetLayers[j] + suffix);
+    }
+    
+    if (typeof logDebug === "function") {
+      logDebug("Color Range: Setting '" + colorRangeValue + "' to layers: " + finalLayerNames.join(", "));
+    }
+    
+    var successCount = 0;
+    var hasError = false;
+    
+    for (var i = 0; i < finalLayerNames.length; i++) {
+      var layerName = finalLayerNames[i];
+      if (applySmartColorRange(doc, layerName, colorRangeValue)) {
+        successCount++;
+      } else {
+        results.errors.push({
+          key: key,
+          error: "Color range not applied to: " + layerName
+        });
+        hasError = true;
+      }
+    }
+    
+    if (successCount > 0 && !hasError) {
+      results.processed.push(key);
     }
   }
   
